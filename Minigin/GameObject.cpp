@@ -1,24 +1,75 @@
 #include <string>
+#include <algorithm>
 #include "GameObject.h"
 #include "ResourceManager.h"
 #include "Renderer.h"
 
+#include "RenderComponent.h"
+#include "TransformComponent.h"
+
+
+
+dae::GameObject::GameObject()
+{
+	m_pTransformComponent	= std::make_shared<TransformComponent>(weak_from_this());
+	m_vecComponents.push_back(m_pTransformComponent);
+	m_pRenderComponent		= std::make_shared<RenderComponent>(weak_from_this());
+	m_vecComponents.push_back(m_pRenderComponent);
+}
+
 dae::GameObject::~GameObject() = default;
 
-void dae::GameObject::Update(){}
+void dae::GameObject::Update(float deltaTime)
+{
+	for (auto& component : m_vecComponents)
+	{
+		component->Update(deltaTime);
+	}
+}
 
 void dae::GameObject::Render() const
 {
-	const auto& pos = m_transform.GetPosition();
-	Renderer::GetInstance().RenderTexture(*m_texture, pos.x, pos.y);
+	if (m_pRenderComponent)
+	{
+		m_pRenderComponent->Render();
+	}
 }
 
-void dae::GameObject::SetTexture(const std::string& filename)
+template<typename T> std::shared_ptr<T> dae::GameObject::AddComponent()
 {
-	m_texture = ResourceManager::GetInstance().LoadTexture(filename);
+	//Check if component already exist
+	const auto checkComponent = GetComponent<T>();
+	if (checkComponent != nullptr)
+	{
+		return checkComponent;
+	}
+	m_vecComponents.push_back(make_unique<T>(weak_from_this()));
+
+	return m_vecComponents.back();
 }
 
-void dae::GameObject::SetPosition(float x, float y)
+
+template <typename T> std::shared_ptr<T> dae::GameObject::GetComponent()
 {
-	m_transform.SetPosition(x, y, 0.0f);
+	for (auto component : m_vecComponents)
+	{
+		auto ptr = std::dynamic_pointer_cast<T>(component);
+		if (ptr) 
+		{
+			return ptr;
+		}
+	}
+	return nullptr;
+}
+
+template <typename T> void dae::GameObject::RemoveComponent()
+{
+	for (auto iterator{ m_vecComponents.begin() }; iterator < m_vecComponents.end(); ++iterator)
+	{
+		const auto& casted = std::dynamic_pointer_cast<T>(*iterator);
+		if (casted)
+		{
+			m_vecComponents.erase(iterator);
+		}
+	}
 }
